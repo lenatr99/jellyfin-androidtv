@@ -347,6 +347,17 @@ public class ItemRowAdapter extends MutableObjectAdapter<Object> {
         this.queryType = QueryType.Resume;
     }
 
+    public ItemRowAdapter(Context context, GetResumeItemsRequest resumeQuery, GetNextUpRequest nextUpQuery, boolean preferParentThumb, boolean staticHeight, Presenter presenter, MutableObjectAdapter<Row> parent) {
+        super(presenter);
+        this.context = context;
+        mParent = parent;
+        this.resumeQuery = resumeQuery;
+        this.mNextUpQuery = nextUpQuery;
+        this.preferParentThumb = preferParentThumb;
+        this.staticHeight = staticHeight;
+        this.queryType = QueryType.ContinueWatchingNextUp;
+    }
+
     public void setItemsLoaded(int itemsLoaded) {
         this.itemsLoaded = itemsLoaded;
         this.fullyLoaded = chunkSize == 0 || itemsLoaded >= totalItems;
@@ -649,6 +660,9 @@ public class ItemRowAdapter extends MutableObjectAdapter<Object> {
                 break;
             case Resume:
                 ItemRowAdapterHelperKt.retrieveResumeItems(this, api.getValue(), resumeQuery);
+                break;
+            case ContinueWatchingNextUp:
+                ItemRowAdapterHelperKt.retrieveContinueWatchingNextUpItems(this, api.getValue(), resumeQuery, mNextUpQuery);
                 break;
         }
     }

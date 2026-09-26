@@ -5,6 +5,8 @@ import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ProcessLifecycleOwner
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.jellyfin.androidtv.R
@@ -12,6 +14,7 @@ import org.jellyfin.androidtv.constant.LiveTvOption
 import org.jellyfin.androidtv.data.querying.GetAdditionalPartsRequest
 import org.jellyfin.androidtv.data.querying.GetSpecialsRequest
 import org.jellyfin.androidtv.data.querying.GetTrailersRequest
+import org.jellyfin.androidtv.data.repository.ItemRepository
 import org.jellyfin.androidtv.data.repository.UserViewsRepository
 import org.jellyfin.androidtv.ui.GridButton
 import org.jellyfin.androidtv.ui.browsing.BrowseGridFragment.SortOption
@@ -25,6 +28,8 @@ import org.jellyfin.sdk.api.client.extensions.tvShowsApi
 import org.jellyfin.sdk.api.client.extensions.userLibraryApi
 import org.jellyfin.sdk.api.client.extensions.userViewsApi
 import org.jellyfin.sdk.api.client.extensions.videosApi
+import org.jellyfin.sdk.model.api.BaseItemDto
+import org.jellyfin.sdk.model.api.BaseItemKind
 import org.jellyfin.sdk.model.api.ItemFilter
 import org.jellyfin.sdk.model.api.ItemSortBy
 import org.jellyfin.sdk.model.api.SeriesTimerInfoDto
@@ -41,6 +46,8 @@ import org.jellyfin.sdk.model.api.request.GetSeasonsRequest
 import org.jellyfin.sdk.model.api.request.GetSimilarItemsRequest
 import org.jellyfin.sdk.model.api.request.GetUpcomingEpisodesRequest
 import timber.log.Timber
+import java.time.LocalDateTime
+import java.util.UUID
 import kotlin.math.min
 
 fun <T : Any> ItemRowAdapter.setItems(
@@ -69,6 +76,83 @@ fun <T : Any> ItemRowAdapter.setItems(
 
 	replaceAll(allItems)
 	itemsLoaded = allItems.size
+}
+
+fun ItemRowAdapter.retrieveContinueWatchingNextUpItems(
+	api: ApiClient,
+	resumeQuery: GetResumeItemsRequest,
+	nextUpQuery: GetNextUpRequest,
+) {
+	ProcessLifecycleOwner.get().lifecycleScope.launch {
+		runCatching {
+			val items = withContext(Dispatchers.IO) {
+				coroutineScope {
+					val resumeDeferred = async {
+						api.itemsApi.getResumeItems(resumeQuery).content.items
+					}
+					val nextUpDeferred = async {
+						api.tvShowsApi.getNextUp(nextUpQuery).content.items
+					}
+					mergeContinueWatchingNextUp(api, resumeDeferred.await(), nextUpDeferred.await())
+				}
+			}
+
+			setItems(
+				items = items,
+				transform = { item, _ ->
+					BaseItemDtoBaseRowItem(
+						item,
+						preferParentThumb,
+						isStaticHeight
+					)
+				}
+			)
+
+			if (items.isEmpty()) removeRow()
+		}.fold(
+			onSuccess = { notifyRetrieveFinished() },
+			onFailure = { error -> notifyRetrieveFinished(error as? Exception) }
+		)
+	}
+}
+
+private suspend fun mergeContinueWatchingNextUp(
+	api: ApiClient,
+	resume: List<BaseItemDto>,
+	nextUp: List<BaseItemDto>,
+): List<BaseItemDto> {
+	val seen = mutableSetOf<UUID>()
+	val combined = ArrayList<BaseItemDto>(resume.size + nextUp.size)
+	for (item in resume) {
+		if (seen.add(item.id)) combined.add(item)
+	}
+	for (item in nextUp) {
+		if (seen.add(item.id)) combined.add(item)
+	}
+
+	val seriesIds = combined
+		.filter { it.type == BaseItemKind.EPISODE && it.userData?.lastPlayedDate == null }
+		.mapNotNull { it.seriesId }
+		.distinct()
+
+	val seriesLastPlayed = if (seriesIds.isEmpty()) {
+		emptyMap()
+	} else {
+		api.itemsApi.getItems(
+			ids = seriesIds,
+			fields = ItemRepository.browseFields,
+			limit = seriesIds.size,
+			enableTotalRecordCount = false,
+			enableUserData = true,
+		).content.items.associate { it.id to it.userData?.lastPlayedDate }
+	}
+
+	return combined.sortedByDescending { item ->
+		item.userData?.lastPlayedDate
+			?: item.seriesId?.let { seriesLastPlayed[it] }
+			?: item.dateCreated
+			?: LocalDateTime.MIN
+	}
 }
 
 fun ItemRowAdapter.retrieveResumeItems(api: ApiClient, query: GetResumeItemsRequest) {

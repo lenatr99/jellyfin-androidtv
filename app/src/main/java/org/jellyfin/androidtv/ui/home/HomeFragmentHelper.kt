@@ -42,6 +42,28 @@ class HomeFragmentHelper(
 		return loadResume(context.getString(R.string.lbl_continue_watching), listOf(MediaType.VIDEO))
 	}
 
+	fun loadContinueWatchingNextUp(): HomeFragmentRow {
+		val resumeQuery = GetResumeItemsRequest(
+			limit = ITEM_LIMIT_RESUME,
+			fields = ItemRepository.browseFields,
+			imageTypeLimit = 1,
+			enableTotalRecordCount = false,
+			mediaTypes = listOf(MediaType.VIDEO),
+			excludeItemTypes = setOf(BaseItemKind.AUDIO_BOOK),
+		)
+		val nextUpQuery = GetNextUpRequest(
+			imageTypeLimit = 1,
+			limit = ITEM_LIMIT_NEXT_UP,
+			enableResumable = false,
+			enableRewatching = false,
+			nextUpDateCutoff = LocalDateTime.now().minusDays(365),
+			fields = ItemRepository.browseFields,
+			enableTotalRecordCount = false,
+		)
+
+		return HomeFragmentContinueWatchingRow(resumeQuery, nextUpQuery)
+	}
+
 	fun loadResumeAudio(): HomeFragmentRow {
 		return loadResume(context.getString(R.string.continue_listening), listOf(MediaType.AUDIO))
 	}
