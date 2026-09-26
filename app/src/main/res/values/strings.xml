@@ -703,7 +703,15 @@
     <string name="eac3_atmos">DD+ Atmos</string>
     <string name="truehd_atmos">TrueHD Atmos</string>
     <string name="lbl_seerr_request">Request on Jellyseerr</string>
-    <string name="lbl_seerr_request_confirm">Not in the library yet. Request it?</string>
     <string name="lbl_seerr_requested">Requested</string>
     <string name="lbl_seerr_request_failed">Request failed</string>
+    <string name="lbl_seerr_in_library">In library</string>
+    <string name="lbl_seerr_open">Open</string>
+    <string name="lbl_seerr_request_more">Request more seasons</string>
+    <string name="lbl_seerr_status">Status</string>
+    <string name="lbl_seerr_not_in_library">Not in library – request to watch</string>
+    <string name="lbl_seerr_released">Released</string>
+    <string name="lbl_seerr_first_aired">First aired</string>
+    <string name="lbl_seerr_network">Network</string>
+    <string name="lbl_seerr_studio">Studio</string>
 </resources>

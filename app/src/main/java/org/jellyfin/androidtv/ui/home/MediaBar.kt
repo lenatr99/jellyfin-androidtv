@@ -124,6 +124,8 @@ fun MediaBar(
 ) {
 	val item by viewModel.currentItem.collectAsState()
 	val trailer by viewModel.trailer.collectAsState()
+	// False while focus is in the rows below; pause video and animation there to keep scrolling smooth
+	val playbackAllowed by viewModel.playbackAllowed.collectAsState()
 	val index by viewModel.index.collectAsState()
 	val items by viewModel.items.collectAsState()
 	val playFocusRequester = remember { FocusRequester() }
@@ -206,28 +208,29 @@ fun MediaBar(
 			HomeFocusLog.i("MediaBar item is null, waiting for pool")
 		} else {
 		val kenBurns = remember(current.item.id) { Animatable(1f) }
-		LaunchedEffect(current.item.id) {
-			kenBurns.snapTo(1f)
-			kenBurns.animateTo(
+		LaunchedEffect(current.item.id, playbackAllowed) {
+			if (!playbackAllowed) return@LaunchedEffect
+			// Resume where it paused, with the remaining share of the duration
+			val remaining = ((1.08f - kenBurns.value) / 0.08f * MediaBarViewModel.KEN_BURNS_MS).toInt()
+			if (remaining > 0) kenBurns.animateTo(
 				1.08f,
-				animationSpec = tween(MediaBarViewModel.KEN_BURNS_MS, easing = LinearEasing),
+				animationSpec = tween(remaining, easing = LinearEasing),
 			)
 		}
-		val kenBurnsScale = kenBurns.value
 		val logoReveal = remember(current.item.id) { Animatable(0.7f) }
 		LaunchedEffect(current.item.id) {
 			logoReveal.snapTo(0.7f)
 			logoReveal.animateTo(1f, tween(MediaBarViewModel.LOGO_REVEAL_MS))
 		}
-		val logoAlpha = logoReveal.value
 
 		Box(modifier = Modifier.fillMaxSize()) {
 			Box(
 				modifier = Modifier
 					.fillMaxSize()
+					// Read animated values inside graphicsLayer so each frame only redraws, not recomposes
 					.graphicsLayer {
-						scaleX = kenBurnsScale
-						scaleY = kenBurnsScale
+						scaleX = kenBurns.value
+						scaleY = kenBurns.value
 						transformOrigin = TransformOrigin(0.5f, 0.2f)
 					},
 			) {
@@ -248,7 +251,7 @@ fun MediaBar(
 
 			MediaBarTrailerPlayer(
 				trailer = trailer,
-				playing = homeResumed && trailer != null,
+				playing = homeResumed && playbackAllowed && trailer != null,
 				onError = viewModel::onTrailerFailed,
 				modifier = Modifier.fillMaxSize(),
 			)
@@ -298,7 +301,7 @@ fun MediaBar(
 								.widthIn(max = 400.dp)
 								.wrapContentWidth(Alignment.Start)
 								.padding(bottom = 4.dp)
-								.graphicsLayer { alpha = logoAlpha },
+								.graphicsLayer { alpha = logoReveal.value },
 							url = slide.logoUrl,
 							blurHash = null,
 							aspectRatio = 0f,
@@ -312,7 +315,7 @@ fun MediaBar(
 							fontWeight = FontWeight.Bold,
 							maxLines = 2,
 							overflow = TextOverflow.Ellipsis,
-							modifier = Modifier.graphicsLayer { alpha = logoAlpha },
+							modifier = Modifier.graphicsLayer { alpha = logoReveal.value },
 						)
 					}
 

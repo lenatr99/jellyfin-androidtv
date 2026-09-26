@@ -124,7 +124,7 @@ class HomeFragment : Fragment() {
 			)
 			HomeFocusLog.dump("focusChange", view, null, homeRows()?.verticalGridView)
 		}
-		view.viewTreeObserver.addOnGlobalFocusChangeListener(focusListener)
+		if (HomeFocusLog.ENABLED) view.viewTreeObserver.addOnGlobalFocusChangeListener(focusListener)
 		view.post {
 			HomeFocusLog.dump("attached", view, null, homeRows()?.verticalGridView)
 		}

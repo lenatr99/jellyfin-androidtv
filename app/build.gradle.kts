@@ -83,6 +83,13 @@ android {
 			resValue("string", "app_name", "@string/app_name_debug")
 
 			buildConfigField("boolean", "DEVELOPMENT", (defaultConfig.versionCode!! < 100).toString())
+
+			// Optimized like release so it runs well on older TVs (-Pfast.debug=false to turn off)
+			if (getProperty("fast.debug") != "false") {
+				isDebuggable = false
+				isMinifyEnabled = true
+				proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+			}
 		}
 	}
 

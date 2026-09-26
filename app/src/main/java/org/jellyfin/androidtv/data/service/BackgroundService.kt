@@ -78,6 +78,17 @@ class BackgroundService(
 	}
 
 	/**
+	 * Use a single backdrop image [url] as background (for titles not in the library).
+	 */
+	fun setBackgroundUrl(url: String) {
+		val backdropBehavior = userPreferences[UserPreferences.backdropBehavior]
+		if (backdropBehavior == BackdropBehavior.DISABLED) return clearBackgrounds()
+
+		_blurBackground.value = backdropBehavior == BackdropBehavior.BACKDROP_WITH_BLUR
+		loadBackgrounds(setOf(url))
+	}
+
+	/**
 	 * Use splashscreen from [server] as background.
 	 */
 	fun setBackground(server: Server) {

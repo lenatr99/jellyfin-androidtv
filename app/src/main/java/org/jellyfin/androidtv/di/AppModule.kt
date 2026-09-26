@@ -180,5 +180,5 @@ val appModule = module {
 	single { ReportingHelper(get(), get()) }
 	single<PlaybackHelper> { SdkPlaybackHelper(get(), get(), get(), get()) }
 
-	factory { (context: Context, scope: CoroutineScope) -> SearchFragmentDelegate(context, get(), get(), get(), scope) }
+	factory { (context: Context, scope: CoroutineScope) -> SearchFragmentDelegate(context, get(), get(), get(), scope, get()) }
 }

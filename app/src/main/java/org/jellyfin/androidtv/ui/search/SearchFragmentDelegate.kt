@@ -1,16 +1,12 @@
 package org.jellyfin.androidtv.ui.search
 
-import android.app.AlertDialog
 import android.content.Context
-import android.widget.Toast
 import androidx.leanback.widget.HeaderItem
 import androidx.leanback.widget.ListRow
 import androidx.leanback.widget.OnItemViewClickedListener
 import androidx.leanback.widget.OnItemViewSelectedListener
 import androidx.leanback.widget.Row
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.launch
-import org.jellyfin.androidtv.R
 import org.jellyfin.androidtv.constant.QueryType
 import org.jellyfin.androidtv.data.service.BackgroundService
 import org.jellyfin.androidtv.ui.itemhandling.BaseRowItem
@@ -20,6 +16,7 @@ import org.jellyfin.androidtv.ui.presentation.CardPresenter
 import org.jellyfin.androidtv.ui.presentation.CustomListRowPresenter
 import org.jellyfin.androidtv.ui.presentation.MutableObjectAdapter
 import org.jellyfin.sdk.api.client.ApiClient
+import org.jellyfin.androidtv.ui.navigation.NavigationRepository
 
 class SearchFragmentDelegate(
 	private val context: Context,
@@ -27,8 +24,10 @@ class SearchFragmentDelegate(
 	private val itemLauncher: ItemLauncher,
 	private val api: ApiClient,
 	private val scope: CoroutineScope,
+	private val navigationRepository: NavigationRepository,
 ) {
 	val rowsAdapter = MutableObjectAdapter<Row>(CustomListRowPresenter())
+	private val seerrRequester = SeerrRequester(context, api, scope, navigationRepository)
 
 	fun showResults(searchResultGroups: Collection<SearchResultGroup>) {
 		rowsAdapter.clear()
@@ -57,32 +56,9 @@ class SearchFragmentDelegate(
 		}
 	}
 
-	private fun confirmRequest(item: SeerrRowItem, adapter: MutableObjectAdapter<SeerrRowItem>) {
-		if (item.requested) {
-			Toast.makeText(context, R.string.lbl_seerr_requested, Toast.LENGTH_SHORT).show()
-			return
-		}
-		AlertDialog.Builder(context)
-			.setTitle(item.title)
-			.setMessage(R.string.lbl_seerr_request_confirm)
-			.setPositiveButton(R.string.lbl_seerr_request) { _, _ ->
-				scope.launch {
-					val ok = SeerrSearch.request(api, item)
-					if (ok) {
-						item.requested = true
-						adapter.indexOf(item).takeIf { it >= 0 }?.let { adapter.set(it, item) }
-					}
-					Toast.makeText(context, if (ok) R.string.lbl_seerr_requested else R.string.lbl_seerr_request_failed, Toast.LENGTH_SHORT).show()
-				}
-			}
-			.setNegativeButton(R.string.lbl_cancel, null)
-			.show()
-	}
-
 	val onItemViewClickedListener = OnItemViewClickedListener { _, item, _, row ->
 		if (item is SeerrRowItem) {
-			@Suppress("UNCHECKED_CAST")
-			confirmRequest(item, (row as ListRow).adapter as MutableObjectAdapter<SeerrRowItem>)
+			seerrRequester.open(item)
 			return@OnItemViewClickedListener
 		}
 		if (item !is BaseRowItem) return@OnItemViewClickedListener

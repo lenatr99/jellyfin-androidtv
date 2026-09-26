@@ -11,11 +11,16 @@ import timber.log.Timber
 internal object HomeFocusLog {
 	const val TAG = "HomeFocus"
 
+	/** Focus tracing for debugging; it logs on every focus change, which is slow on older TVs. */
+	const val ENABLED = false
+
 	fun i(message: String, vararg args: Any?) {
+		if (!ENABLED) return
 		Timber.tag(TAG).i(message, *args)
 	}
 
 	fun describe(view: View?): String {
+		if (!ENABLED) return ""
 		if (view == null) return "null"
 		val id = viewId(view)
 		val loc = IntArray(2)
@@ -46,6 +51,7 @@ internal object HomeFocusLog {
 	}
 
 	fun key(host: View, event: KeyEvent) {
+		if (!ENABLED) return
 		if (event.action != KeyEvent.ACTION_DOWN || event.repeatCount != 0) return
 		when (event.keyCode) {
 			KeyEvent.KEYCODE_DPAD_UP,
@@ -66,6 +72,7 @@ internal object HomeFocusLog {
 	}
 
 	fun dump(label: String, root: View?, toolbar: View?, grid: View?) {
+		if (!ENABLED) return
 		i("DUMP %s toolbar=%s", label, describe(toolbar))
 		if (toolbar is ViewGroup) {
 			for (index in 0 until toolbar.childCount) {
@@ -79,6 +86,7 @@ internal object HomeFocusLog {
 	}
 
 	fun focusChain(view: View?): String {
+		if (!ENABLED) return ""
 		val chain = ArrayList<String>(12)
 		var current: View? = view
 		while (current != null && chain.size < 12) {

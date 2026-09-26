@@ -217,9 +217,8 @@ class MediaBarViewModel(
 			if (items.isEmpty()) return@launch
 			val start = _index.value
 			val upcoming = (1 until items.size).map { items[(start + it) % items.size] }
+			// Later slides resolve their own trailer when shown
 			upcoming.take(PREFETCH_AHEAD).forEach { trailerFor(it.item) }
-			delay(2.seconds)
-			upcoming.drop(PREFETCH_AHEAD).forEach { trailerFor(it.item) }
 		}
 	}
 

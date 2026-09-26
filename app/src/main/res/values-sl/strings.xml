@@ -640,7 +640,15 @@
     <string name="backdrop_behavior_with_blur">Ozadje z zameglitvijo</string>
     <string name="backdrop_behavior_without_blur">Ozadje brez zameglitve</string>
     <string name="lbl_seerr_request">Zahtevaj na Jellyseerr</string>
-    <string name="lbl_seerr_request_confirm">Tega še ni v knjižnici. Ga želiš zahtevati?</string>
     <string name="lbl_seerr_requested">Zahtevano</string>
     <string name="lbl_seerr_request_failed">Zahteva ni uspela</string>
+    <string name="lbl_seerr_in_library">V knjižnici</string>
+    <string name="lbl_seerr_open">Odpri</string>
+    <string name="lbl_seerr_request_more">Zahtevaj več sezon</string>
+    <string name="lbl_seerr_status">Stanje</string>
+    <string name="lbl_seerr_not_in_library">Ni v knjižnici – zahtevaj za ogled</string>
+    <string name="lbl_seerr_released">Izid</string>
+    <string name="lbl_seerr_first_aired">Prvo predvajanje</string>
+    <string name="lbl_seerr_network">Mreža</string>
+    <string name="lbl_seerr_studio">Studio</string>
 </resources>

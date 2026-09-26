@@ -9,6 +9,7 @@ import androidx.core.content.ContextCompat
 import androidx.leanback.app.RowsSupportFragment
 import androidx.leanback.widget.ClassPresenterSelector
 import androidx.leanback.widget.ListRow
+import androidx.leanback.widget.ListRowPresenter
 import androidx.leanback.widget.OnItemViewClickedListener
 import androidx.leanback.widget.OnItemViewSelectedListener
 import androidx.leanback.widget.Presenter
@@ -33,6 +34,7 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.yield
 import org.jellyfin.androidtv.R
 import org.jellyfin.androidtv.auth.repository.UserRepository
 import org.jellyfin.androidtv.constant.CustomMessage
@@ -59,6 +61,8 @@ import org.jellyfin.androidtv.ui.playback.AudioEventListener
 import org.jellyfin.androidtv.ui.playback.MediaManager
 import org.jellyfin.androidtv.ui.presentation.CardPresenter
 import org.jellyfin.androidtv.ui.presentation.MutableObjectAdapter
+import org.jellyfin.androidtv.ui.search.SeerrRequester
+import org.jellyfin.androidtv.ui.search.SeerrRowItem
 import org.jellyfin.androidtv.ui.presentation.PositionableListRowPresenter
 import org.jellyfin.androidtv.util.KeyProcessor
 import org.jellyfin.playback.core.PlaybackManager
@@ -84,6 +88,9 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 	private val dataRefreshService by inject<DataRefreshService>()
 	private val customMessageRepository by inject<CustomMessageRepository>()
 	private val navigationRepository by inject<NavigationRepository>()
+	private val seerrRequester by lazy {
+		SeerrRequester(requireContext(), api, lifecycleScope, navigationRepository)
+	}
 	private val itemLauncher by inject<ItemLauncher>()
 	private val keyProcessor by inject<KeyProcessor>()
 	private val mediaBarViewModel by viewModel<MediaBarViewModel>()
@@ -127,6 +134,7 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 			val homesections = userSettingPreferences.activeHomesections
 			// Web home sections from the server plugin; these replace the built-in latest rows
 			val pluginSections = HomeFragmentPluginSectionRow.sections(api, currentUser.id)
+			val charts = if (pluginSections.isEmpty()) emptyMap() else HomeFragmentPluginSectionRow.charts(api)
 
 			// Make sure the rows are empty
 			val rows = mutableListOf<HomeFragmentRow>()
@@ -171,7 +179,7 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 			val pluginRows = coroutineScope {
 				pluginSections.map { section ->
 					async(pluginSectionDispatcher) {
-						HomeFragmentPluginSectionRow(section.title, HomeFragmentPluginSectionRow.fetch(api, currentUser.id, section))
+						HomeFragmentPluginSectionRow.load(api, currentUser.id, section, charts)
 					}
 				}.awaitAll()
 			}
@@ -184,7 +192,11 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 				// Add rows in order
 				notificationsRow.addToRowsAdapter(requireContext(), cardPresenter, adapter as MutableObjectAdapter<Row>)
 				nowPlaying.addToRowsAdapter(requireContext(), cardPresenter, adapter as MutableObjectAdapter<Row>)
-				for (row in rows) row.addToRowsAdapter(requireContext(), cardPresenter, adapter as MutableObjectAdapter<Row>)
+				for (row in rows) {
+					row.addToRowsAdapter(requireContext(), cardPresenter, adapter as MutableObjectAdapter<Row>)
+					// Let the screen draw and handle key presses between rows; adding ~30 at once froze older TVs
+					yield()
+				}
 
 				// Wire up Live TV sibling rows so the On Now row removes the buttons row when empty
 				@Suppress("UNCHECKED_CAST")
@@ -318,9 +330,19 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 
 			val grid = verticalGridView ?: return@post
 
-			// Home always lands at the Media Bar.
-			grid.setSelectedPosition(0)
-			applyWindowAlignment(mediaBarSelected = true)
+			// Back from a details page: return to the card that was opened. A fresh home lands at the Media Bar.
+			val row = currentRow
+			val rowIndex = if (returningToHome && row != null) (this.adapter as MutableObjectAdapter<Row>).indexOf(row) else -1
+			if (row != null && rowIndex > 0) {
+				val items = row.adapter
+				val itemIndex = (0 until items.size()).indexOfFirst { items.get(it) == currentItem }.coerceAtLeast(0)
+				setSelectedPosition(rowIndex, false, ListRowPresenter.SelectItemViewHolderTask(itemIndex))
+				applyWindowAlignment(mediaBarSelected = false)
+				mediaBarViewModel.setPlaybackAllowed(false)
+			} else {
+				grid.setSelectedPosition(0)
+				applyWindowAlignment(mediaBarSelected = true)
+			}
 
 			grid.post {
 				if (!isAdded) return@post
@@ -398,6 +420,11 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 					LiveTvOption.LIVE_TV_RECORDINGS_OPTION_ID -> navigationRepository.navigate(Destinations.liveTvRecordings)
 					LiveTvOption.LIVE_TV_SERIES_OPTION_ID -> navigationRepository.navigate(Destinations.liveTvSeriesRecordings)
 				}
+			}
+
+			if (item is SeerrRowItem && row is ListRow) {
+				seerrRequester.open(item)
+				return
 			}
 
 			if (item !is BaseRowItem) return

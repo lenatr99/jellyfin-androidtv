@@ -23,6 +23,8 @@ import org.jellyfin.androidtv.ui.playback.stillwatching.StillWatchingFragment
 import org.jellyfin.androidtv.ui.player.photo.PhotoPlayerFragment
 import org.jellyfin.androidtv.ui.player.video.VideoPlayerFragment
 import org.jellyfin.androidtv.ui.search.SearchFragment
+import org.jellyfin.androidtv.ui.search.SeerrDetailsFragment
+import org.jellyfin.androidtv.ui.search.SeerrRowItem
 import org.jellyfin.sdk.model.api.BaseItemDto
 import org.jellyfin.sdk.model.api.ItemSortBy
 import org.jellyfin.sdk.model.api.SeriesTimerInfoDto
@@ -83,6 +85,16 @@ object Destinations {
 	// Item details
 	fun itemDetails(item: UUID) = fragmentDestination<FullDetailsFragment> {
 		putString("ItemId", item.toString())
+	}
+
+	fun seerrDetails(item: SeerrRowItem) = fragmentDestination<SeerrDetailsFragment> {
+		putInt(SeerrDetailsFragment.ARG_TMDB_ID, item.tmdbId)
+		putString(SeerrDetailsFragment.ARG_MEDIA_TYPE, item.mediaType)
+		putString(SeerrDetailsFragment.ARG_TITLE, item.title)
+		putString(SeerrDetailsFragment.ARG_YEAR, item.year)
+		putString(SeerrDetailsFragment.ARG_POSTER, item.posterUrl)
+		putBoolean(SeerrDetailsFragment.ARG_REQUESTED, item.requested)
+		putString(SeerrDetailsFragment.ARG_LIBRARY_ID, item.libraryId?.toString())
 	}
 
 	// TODO only pass item id instead of complete JSON to browsing destinations
