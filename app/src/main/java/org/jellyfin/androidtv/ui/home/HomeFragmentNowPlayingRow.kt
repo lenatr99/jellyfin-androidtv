@@ -35,7 +35,7 @@ class HomeFragmentNowPlayingRow(
 				AudioQueueBaseRowAdapter(playbackManager, lifecycleScope)
 			)
 			// Add row if it wasn't added already
-			if (!rowsAdapter.contains(row!!)) rowsAdapter.add(0, row!!)
+			if (!rowsAdapter.contains(row!!)) rowsAdapter.addAfterMediaBar(row!!)
 		} else if (row != null) {
 			rowsAdapter.remove(row!!)
 			row = null

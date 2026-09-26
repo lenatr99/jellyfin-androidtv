@@ -1,21 +1,27 @@
 package org.jellyfin.androidtv.ui.home
 
 import android.os.Bundle
+import android.util.TypedValue
 import android.view.KeyEvent
 import android.view.View
+import android.view.ViewGroup
+import androidx.core.content.ContextCompat
 import androidx.leanback.app.RowsSupportFragment
+import androidx.leanback.widget.ClassPresenterSelector
 import androidx.leanback.widget.ListRow
 import androidx.leanback.widget.OnItemViewClickedListener
 import androidx.leanback.widget.OnItemViewSelectedListener
 import androidx.leanback.widget.Presenter
 import androidx.leanback.widget.Row
 import androidx.leanback.widget.RowPresenter
+import androidx.leanback.widget.VerticalGridView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.flowWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.launchIn
@@ -24,6 +30,7 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
+import org.jellyfin.androidtv.R
 import org.jellyfin.androidtv.auth.repository.UserRepository
 import org.jellyfin.androidtv.constant.CustomMessage
 import org.jellyfin.androidtv.constant.HomeSectionType
@@ -57,6 +64,7 @@ import org.jellyfin.sdk.api.sockets.subscribe
 import org.jellyfin.sdk.model.api.LibraryChangedMessage
 import org.jellyfin.sdk.model.api.UserDataChangedMessage
 import org.koin.android.ext.android.inject
+import org.koin.androidx.viewmodel.ext.android.viewModel
 import timber.log.Timber
 import kotlin.time.Duration.Companion.seconds
 
@@ -75,6 +83,7 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 	private val navigationRepository by inject<NavigationRepository>()
 	private val itemLauncher by inject<ItemLauncher>()
 	private val keyProcessor by inject<KeyProcessor>()
+	private val mediaBarViewModel by viewModel<MediaBarViewModel>()
 
 	private val helper by lazy { HomeFragmentHelper(requireContext(), userRepository, userPreferences) }
 
@@ -90,7 +99,21 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 	override fun onCreate(savedInstanceState: Bundle?) {
 		super.onCreate(savedInstanceState)
 
-		adapter = MutableObjectAdapter<Row>(PositionableListRowPresenter())
+		val presenterSelector = ClassPresenterSelector().apply {
+			addClassPresenter(MediaBarRow::class.java, MediaBarRowPresenter())
+			addClassPresenter(ListRow::class.java, PositionableListRowPresenter())
+		}
+		val rowsAdapter = MutableObjectAdapter<Row>(presenterSelector)
+		rowsAdapter.add(MediaBarRow())
+		adapter = rowsAdapter
+
+		lifecycleScope.launch {
+			mediaBarViewModel.loaded.filter { it }.first()
+			if (mediaBarViewModel.items.value.isEmpty()) {
+				val hero = rowsAdapter.firstOrNull { it is MediaBarRow } ?: return@launch
+				rowsAdapter.remove(hero)
+			}
+		}
 
 		lifecycleScope.launch(Dispatchers.IO) {
 			val currentUser = withTimeout(30.seconds) {
@@ -102,26 +125,44 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 
 			// Make sure the rows are empty
 			val rows = mutableListOf<HomeFragmentRow>()
+			var insertRequestsAt: Int? = null
+			var addedContinueWatching = false
 
 			// Check for coroutine cancellation
 			if (!isActive) return@launch
 
 			// Actually add the sections
-			for (section in homesections) when (section) {
-				HomeSectionType.LATEST_MEDIA -> rows.add(helper.loadRecentlyAdded(userViewsRepository.views.first()))
-				HomeSectionType.LIBRARY_TILES_SMALL -> rows.add(HomeFragmentViewsRow(small = false))
-				HomeSectionType.LIBRARY_BUTTONS -> rows.add(HomeFragmentViewsRow(small = true))
-				HomeSectionType.RESUME -> rows.add(helper.loadResumeVideo())
-				HomeSectionType.RESUME_AUDIO -> rows.add(helper.loadResumeAudio())
-				HomeSectionType.RESUME_BOOK -> Unit // Books are not (yet) supported
-				HomeSectionType.ACTIVE_RECORDINGS -> rows.add(helper.loadLatestLiveTvRecordings())
-				HomeSectionType.NEXT_UP -> rows.add(helper.loadNextUp())
-				HomeSectionType.LIVE_TV -> if (currentUser.policy?.enableLiveTvAccess == true) {
-					rows.add(HomeFragmentLiveTVRow(requireActivity(), userRepository))
-					rows.add(helper.loadOnNow())
-				}
+			for (section in homesections) {
+				val before = rows.size
+				when (section) {
+					HomeSectionType.LATEST_MEDIA -> rows.add(helper.loadRecentlyAdded(userViewsRepository.views.first()))
+					// Hide My Media; libraries stay reachable from the sidebar.
+					HomeSectionType.LIBRARY_TILES_SMALL,
+					HomeSectionType.LIBRARY_BUTTONS -> Unit
+					HomeSectionType.RESUME,
+					HomeSectionType.NEXT_UP -> if (!addedContinueWatching) {
+						rows.add(helper.loadContinueWatchingNextUp())
+						addedContinueWatching = true
+					}
+					HomeSectionType.RESUME_AUDIO -> rows.add(helper.loadResumeAudio())
+					HomeSectionType.RESUME_BOOK -> Unit // Books are not (yet) supported
+					HomeSectionType.ACTIVE_RECORDINGS -> rows.add(helper.loadLatestLiveTvRecordings())
+					HomeSectionType.LIVE_TV -> if (currentUser.policy?.enableLiveTvAccess == true) {
+						rows.add(HomeFragmentLiveTVRow(requireActivity(), userRepository))
+						rows.add(helper.loadOnNow())
+					}
 
-				HomeSectionType.NONE -> Unit
+					HomeSectionType.NONE -> Unit
+				}
+				// Match the web plugin order: after Continue Watching / Next Up.
+				if (section == HomeSectionType.RESUME || section == HomeSectionType.NEXT_UP) {
+					if (rows.size > before) insertRequestsAt = rows.size
+				}
+			}
+
+			val requestItems = HomeFragmentRequestsRow.fetch(api, currentUser.id)
+			if (requestItems.isNotEmpty()) {
+				rows.add(insertRequestsAt ?: rows.size, HomeFragmentRequestsRow(requestItems))
 			}
 
 			// Add sections to layout
@@ -140,8 +181,8 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 					val listRow = rowsAdapter.get(i) as? ListRow ?: continue
 					val itemAdapter = listRow.adapter as? ItemRowAdapter ?: continue
 					if (itemAdapter.queryType == QueryType.LiveTvProgram && i > 0) {
-						val previousRow = rowsAdapter.get(i - 1)
-						if (previousRow != null) itemAdapter.setSiblingRow(previousRow)
+						val previousRow = rowsAdapter.get(i - 1) as? ListRow ?: continue
+						itemAdapter.setSiblingRow(previousRow)
 					}
 				}
 			}
@@ -181,6 +222,46 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 		mediaManager.addAudioEventListener(this)
 	}
 
+	override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+		super.onViewCreated(view, savedInstanceState)
+
+		verticalGridView?.apply {
+			windowAlignment = VerticalGridView.WINDOW_ALIGN_LOW_EDGE
+			windowAlignmentOffsetPercent = -1f
+			itemAlignmentOffset = 0
+			itemAlignmentOffsetPercent = 0f
+			clipToPadding = false
+			clipChildren = false
+			descendantFocusability = ViewGroup.FOCUS_AFTER_DESCENDANTS
+			setBackgroundColor(ContextCompat.getColor(requireContext(), R.color.media_bar_navy))
+			setItemSpacing(0)
+			applyWindowAlignment(mediaBarSelected = true)
+			post {
+				val focused = requestFocus()
+				HomeFocusLog.i(
+					"initial grid requestFocus=%s selected=%s focused=%s",
+					focused,
+					selectedPosition,
+					HomeFocusLog.describe(findFocus()),
+				)
+			}
+		}
+	}
+
+	fun setGridFocusBlocked(blocked: Boolean) {
+		HomeFocusLog.i(
+			"setGridFocusBlocked blocked=%s selected=%s focused=%s",
+			blocked,
+			selectedPosition,
+			HomeFocusLog.describe(verticalGridView?.findFocus()),
+		)
+		verticalGridView?.descendantFocusability = if (blocked) {
+			ViewGroup.FOCUS_BLOCK_DESCENDANTS
+		} else {
+			ViewGroup.FOCUS_AFTER_DESCENDANTS
+		}
+	}
+
 	override fun onKey(v: View?, keyCode: Int, event: KeyEvent?): Boolean {
 		if (event?.action != KeyEvent.ACTION_UP) return false
 		return keyProcessor.handleKey(keyCode, currentItem, activity)
@@ -189,24 +270,57 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 	override fun onResume() {
 		super.onResume()
 
-		//React to deletion
-		if (currentRow != null && currentItem != null && currentItem?.baseItem != null && currentItem!!.baseItem!!.id == dataRefreshService.lastDeletedItemId) {
+		val returningToHome = !justLoaded
+
+		// Keep the home backdrop stable like the web Media Bar: row focus must not swap the
+		// full-screen background behind Movies / TV Shows / other pills.
+		backgroundService.clearBackgrounds()
+
+		if (currentRow != null &&
+			currentItem != null &&
+			currentItem?.baseItem != null &&
+			currentItem!!.baseItem!!.id == dataRefreshService.lastDeletedItemId
+		) {
 			(currentRow!!.adapter as ItemRowAdapter).remove(currentItem)
 			currentItem = null
 			dataRefreshService.lastDeletedItemId = null
 		}
 
-		if (!justLoaded) {
-			//Re-retrieve anything that needs it but delay slightly so we don't take away gui landing
+		if (returningToHome) {
 			refreshCurrentItem()
 			refreshRows()
 		} else {
 			justLoaded = false
 		}
 
-		// Update audio queue
+		val selected =
+			(adapter as? MutableObjectAdapter<Row>)?.get(selectedPosition)
+
+		mediaBarViewModel.setPlaybackAllowed(selected is MediaBarRow)
+
 		Timber.i("Updating audio queue in HomeFragment (onResume)")
 		nowPlaying.update(requireContext(), adapter as MutableObjectAdapter<Row>)
+
+		verticalGridView?.post {
+			if (!isAdded) return@post
+
+			val grid = verticalGridView ?: return@post
+
+			// Home always lands at the Media Bar.
+			grid.setSelectedPosition(0)
+			applyWindowAlignment(mediaBarSelected = true)
+
+			grid.post {
+				if (!isAdded) return@post
+
+				(parentFragment as? HomeFragment)?.focusRows()
+			}
+		}
+	}
+
+	override fun onPause() {
+		mediaBarViewModel.setPlaybackAllowed(false)
+		super.onPause()
 	}
 
 	override fun onQueueStatusChanged(hasQueue: Boolean) {
@@ -242,6 +356,22 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 		mediaManager.removeAudioEventListener(this)
 	}
 
+	private fun applyWindowAlignment(mediaBarSelected: Boolean) {
+		val grid = verticalGridView ?: return
+		val offset = if (mediaBarSelected) {
+			0
+		} else {
+			TypedValue.applyDimension(
+				TypedValue.COMPLEX_UNIT_DIP,
+				CONTENT_ROW_TOP_DP,
+				resources.displayMetrics,
+			).toInt()
+		}
+		if (grid.windowAlignmentOffset != offset) {
+			grid.windowAlignmentOffset = offset
+		}
+	}
+
 	private inner class ItemViewClickedListener : OnItemViewClickedListener {
 		override fun onItemClicked(
 			itemViewHolder: Presenter.ViewHolder?,
@@ -272,19 +402,40 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 			rowViewHolder: RowPresenter.ViewHolder?,
 			row: Row?,
 		) {
+			if (row is MediaBarRow) {
+				HomeFocusLog.i(
+					"selected MediaBarRow holder=%s focused=%s",
+					rowViewHolder?.view?.javaClass?.simpleName,
+					HomeFocusLog.describe(verticalGridView?.findFocus()),
+				)
+
+				currentItem = null
+				currentRow = null
+
+				mediaBarViewModel.setPlaybackAllowed(
+					lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)
+				)
+
+				applyWindowAlignment(mediaBarSelected = true)
+				return
+			}
+
+			mediaBarViewModel.setPlaybackAllowed(false)
+			applyWindowAlignment(mediaBarSelected = false)
+
 			if (item !is BaseRowItem) {
 				currentItem = null
-				//fill in default background
-				backgroundService.clearBackgrounds()
 			} else {
 				currentItem = item
 				currentRow = row as ListRow
 
 				val itemRowAdapter = row.adapter as? ItemRowAdapter
 				itemRowAdapter?.loadMoreItemsIfNeeded(itemRowAdapter.indexOf(item))
-
-				backgroundService.setBackground(item.baseItem)
 			}
 		}
+	}
+
+	companion object {
+		private const val CONTENT_ROW_TOP_DP = 108f
 	}
 }

@@ -40,7 +40,7 @@ class NotificationsHomeFragmentRow(
 		}
 
 		if (!empty && !rowAdded) {
-			rowsAdapter?.add(0, listRow)
+			rowsAdapter?.addAfterMediaBar(listRow)
 			rowAdded = true
 		}
 	}
