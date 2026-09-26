@@ -1,6 +1,8 @@
 <resources>
     <!-- Base Colors -->
     <color name="jellyfin_blue">#00a4dc</color>
+    <color name="media_bar_navy_top">#1D2635</color>
+    <color name="media_bar_navy">#111827</color>
     <color name="jellyfin_purple">#aa5cc3</color>
     <color name="midnight_blue">#031A6B</color>
     <color name="indigo_dye">#033860</color>

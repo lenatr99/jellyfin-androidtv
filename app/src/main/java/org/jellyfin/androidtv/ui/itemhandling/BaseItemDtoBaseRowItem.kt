@@ -3,7 +3,9 @@ package org.jellyfin.androidtv.ui.itemhandling
 import android.content.Context
 import org.jellyfin.androidtv.util.apiclient.JellyfinImage
 import org.jellyfin.androidtv.util.apiclient.albumPrimaryImage
+import org.jellyfin.androidtv.util.apiclient.itemBackdropImages
 import org.jellyfin.androidtv.util.apiclient.itemImages
+import org.jellyfin.androidtv.util.apiclient.parentBackdropImages
 import org.jellyfin.androidtv.util.apiclient.parentImages
 import org.jellyfin.androidtv.util.apiclient.seriesPrimaryImage
 import org.jellyfin.androidtv.util.apiclient.seriesThumbImage
@@ -116,9 +118,15 @@ open class BaseItemDtoBaseRowItem @JvmOverloads constructor(
 			else -> null
 		} ?: baseItem?.itemImages[ImageType.PRIMARY]
 
+		val landscapeImage = baseItem?.itemImages[ImageType.THUMB]
+			?: baseItem?.parentImages[ImageType.THUMB]
+			?: baseItem?.seriesThumbImage
+			?: baseItem?.itemBackdropImages?.firstOrNull()
+			?: baseItem?.parentBackdropImages?.firstOrNull()
+
 		return when (imageType) {
-			BaseRowImageType.BANNER -> baseItem?.itemImages[ImageType.BANNER] ?: primaryImage
-			BaseRowImageType.THUMB -> baseItem?.itemImages[ImageType.THUMB] ?: primaryImage
+			BaseRowImageType.BANNER -> baseItem?.itemImages[ImageType.BANNER] ?: landscapeImage ?: primaryImage
+			BaseRowImageType.THUMB -> landscapeImage ?: primaryImage
 			else -> primaryImage
 		}
 	}

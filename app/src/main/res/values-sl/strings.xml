@@ -53,7 +53,8 @@
     <string name="lbl_play_all">Predvajaj vse</string>
     <string name="lbl_other">Ostalo</string>
     <string name="lbl_tv_series">TV serije</string>
-    <string name="lbl_movies">FIlmi</string>
+    <string name="lbl_tv_shows">TV oddaje</string>
+    <string name="lbl_movies">Filmi</string>
     <string name="lbl_collections">Zbirke</string>
     <string name="lbl_other_channels">Ostali kanali</string>
     <string name="lbl_favorite_channels">Najljubši kanali</string>

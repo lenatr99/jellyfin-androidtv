@@ -22,6 +22,12 @@ open class CustomListRowPresenter @JvmOverloads constructor(
 
 		val view = holder.view?.parent as? View ?: return
 		if (topPadding != null) view.setPadding(view.paddingLeft, topPadding, view.paddingRight, view.paddingBottom)
+		view.setBackgroundColor(android.graphics.Color.TRANSPARENT)
+		(view as? android.view.ViewGroup)?.apply {
+			clipChildren = false
+			clipToPadding = false
+		}
+		holder.view?.setBackgroundColor(android.graphics.Color.TRANSPARENT)
 
 		// Hide header view when the item doesn't have one
 		holder.headerViewHolder.view.isVisible = !(item is ListRow && item.headerItem == null)

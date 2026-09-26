@@ -17,6 +17,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImagePainter
 import coil3.compose.rememberAsyncImagePainter
@@ -24,6 +25,7 @@ import kotlinx.coroutines.flow.filterNotNull
 import org.jellyfin.androidtv.R
 import org.jellyfin.androidtv.auth.repository.SessionRepository
 import org.jellyfin.androidtv.auth.repository.UserRepository
+import org.jellyfin.androidtv.data.repository.UserViewsRepository
 import org.jellyfin.androidtv.ui.NowPlayingComposable
 import org.jellyfin.androidtv.ui.base.Icon
 import org.jellyfin.androidtv.ui.base.JellyfinTheme
@@ -31,9 +33,11 @@ import org.jellyfin.androidtv.ui.base.ProfilePicture
 import org.jellyfin.androidtv.ui.base.ProvideTextStyle
 import org.jellyfin.androidtv.ui.base.Text
 import org.jellyfin.androidtv.ui.base.button.Button
+import org.jellyfin.androidtv.ui.base.button.ButtonColors
 import org.jellyfin.androidtv.ui.base.button.ButtonDefaults
 import org.jellyfin.androidtv.ui.base.button.IconButton
 import org.jellyfin.androidtv.ui.base.button.IconButtonDefaults
+import org.jellyfin.androidtv.ui.itemhandling.ItemLauncher
 import org.jellyfin.androidtv.ui.navigation.ActivityDestinations
 import org.jellyfin.androidtv.ui.navigation.Destinations
 import org.jellyfin.androidtv.ui.navigation.NavigationRepository
@@ -42,12 +46,16 @@ import org.jellyfin.androidtv.ui.settings.compat.SettingsViewModel
 import org.jellyfin.androidtv.util.apiclient.getUrl
 import org.jellyfin.androidtv.util.apiclient.primaryImage
 import org.jellyfin.sdk.api.client.ApiClient
+import org.jellyfin.sdk.model.api.CollectionType
 import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinActivityViewModel
 
 enum class MainToolbarActiveButton {
 	User,
 	Home,
+	Movies,
+	TvShows,
+	Collections,
 	Search,
 
 	None,
@@ -56,6 +64,8 @@ enum class MainToolbarActiveButton {
 @Composable
 fun MainToolbar(
 	activeButton: MainToolbarActiveButton = MainToolbarActiveButton.None,
+	modifier: Modifier = Modifier,
+	focusRequester: FocusRequester? = null,
 ) {
 	val userRepository = koinInject<UserRepository>()
 	val api = koinInject<ApiClient>()
@@ -67,6 +77,8 @@ fun MainToolbar(
 	MainToolbar(
 		userImage = userImage,
 		activeButton = activeButton,
+		modifier = modifier,
+		focusRequester = focusRequester,
 	)
 }
 
@@ -74,21 +86,30 @@ fun MainToolbar(
 private fun MainToolbar(
 	userImage: String? = null,
 	activeButton: MainToolbarActiveButton,
+	modifier: Modifier = Modifier,
+	focusRequester: FocusRequester? = null,
 ) {
-	val focusRequester = remember { FocusRequester() }
+	val fallbackFocusRequester = remember { FocusRequester() }
+	val restoredFocusRequester = focusRequester ?: fallbackFocusRequester
 	val navigationRepository = koinInject<NavigationRepository>()
 	val mediaManager = koinInject<MediaManager>()
 	val sessionRepository = koinInject<SessionRepository>()
+	val userViewsRepository = koinInject<UserViewsRepository>()
+	val itemLauncher = koinInject<ItemLauncher>()
 	val settingsViewModel = koinActivityViewModel<SettingsViewModel>()
 	val activity = LocalActivity.current
+	val views by userViewsRepository.views.collectAsState(emptyList())
+	val moviesView = views.firstOrNull { it.collectionType == CollectionType.MOVIES }
+	val tvShowsView = views.firstOrNull { it.collectionType == CollectionType.TVSHOWS }
+	val collectionsView = views.firstOrNull { it.collectionType == CollectionType.BOXSETS }
 	val activeButtonColors = ButtonDefaults.colors(
 		containerColor = JellyfinTheme.colorScheme.buttonActive,
 		contentColor = JellyfinTheme.colorScheme.onButtonActive,
 	)
 
 	Toolbar(
-		modifier = Modifier
-			.focusRestorer(focusRequester)
+		modifier = modifier
+			.focusRestorer(restoredFocusRequester)
 			.focusGroup(),
 		start = {
 			ToolbarButtons {
@@ -127,10 +148,13 @@ private fun MainToolbar(
 		center = {
 			ToolbarButtons(
 				modifier = Modifier
-					.focusRequester(focusRequester)
+					.focusRequester(restoredFocusRequester)
 			) {
 				ProvideTextStyle(JellyfinTheme.typography.default.copy(fontWeight = FontWeight.Bold)) {
-					Button(
+					ToolbarNavButton(
+						label = stringResource(R.string.lbl_home),
+						selected = activeButton == MainToolbarActiveButton.Home,
+						activeColors = activeButtonColors,
 						onClick = {
 							if (activeButton != MainToolbarActiveButton.Home) {
 								navigationRepository.navigate(
@@ -139,17 +163,52 @@ private fun MainToolbar(
 								)
 							}
 						},
-						colors = if (activeButton == MainToolbarActiveButton.Home) activeButtonColors else ButtonDefaults.colors(),
-						content = { Text(stringResource(R.string.lbl_home)) }
 					)
-					Button(
+					moviesView?.let { view ->
+						ToolbarNavButton(
+							label = stringResource(R.string.lbl_movies),
+							selected = activeButton == MainToolbarActiveButton.Movies,
+							activeColors = activeButtonColors,
+							onClick = {
+								if (activeButton != MainToolbarActiveButton.Movies) {
+									itemLauncher.launchUserView(view)
+								}
+							},
+						)
+					}
+					tvShowsView?.let { view ->
+						ToolbarNavButton(
+							label = stringResource(R.string.lbl_tv_shows),
+							selected = activeButton == MainToolbarActiveButton.TvShows,
+							activeColors = activeButtonColors,
+							onClick = {
+								if (activeButton != MainToolbarActiveButton.TvShows) {
+									itemLauncher.launchUserView(view)
+								}
+							},
+						)
+					}
+					collectionsView?.let { view ->
+						ToolbarNavButton(
+							label = stringResource(R.string.lbl_collections),
+							selected = activeButton == MainToolbarActiveButton.Collections,
+							activeColors = activeButtonColors,
+							onClick = {
+								if (activeButton != MainToolbarActiveButton.Collections) {
+									itemLauncher.launchUserView(view)
+								}
+							},
+						)
+					}
+					ToolbarNavButton(
+						label = stringResource(R.string.lbl_search),
+						selected = activeButton == MainToolbarActiveButton.Search,
+						activeColors = activeButtonColors,
 						onClick = {
 							if (activeButton != MainToolbarActiveButton.Search) {
 								navigationRepository.navigate(Destinations.search())
 							}
 						},
-						colors = if (activeButton == MainToolbarActiveButton.Search) activeButtonColors else ButtonDefaults.colors(),
-						content = { Text(stringResource(R.string.lbl_search)) }
 					)
 				}
 			}
@@ -169,4 +228,24 @@ private fun MainToolbar(
 			}
 		}
 	)
+}
+
+@Composable
+private fun ToolbarNavButton(
+	label: String,
+	selected: Boolean,
+	activeColors: ButtonColors,
+	onClick: () -> Unit,
+) {
+	Button(
+		onClick = onClick,
+		colors = if (selected) activeColors else ButtonDefaults.colors(),
+		contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp),
+	) {
+		Text(
+			text = label,
+			maxLines = 1,
+			overflow = TextOverflow.Ellipsis,
+		)
+	}
 }

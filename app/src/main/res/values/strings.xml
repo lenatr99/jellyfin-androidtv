@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources xmlns:tools="http://schemas.android.com/tools" tools:ignore="MissingTranslation">
     <string name="app_name_release" translatable="false" tools:ignore="UnusedResources">Jellyfin</string>
-    <string name="app_name_debug" translatable="false" tools:ignore="UnusedResources">Jellyfin Debug</string>
+    <string name="app_name_debug" translatable="false" tools:ignore="UnusedResources">Jellyfin</string>
     <string name="video_error_unknown_error">Failed to load video</string>
     <string name="loading">Loading…</string>
     <string name="btn_cancel">Cancel</string>
@@ -35,11 +35,13 @@
     <string name="lbl_collections">Collections</string>
     <string name="lbl_movies">Movies</string>
     <string name="lbl_tv_series">TV series</string>
+    <string name="lbl_tv_shows">TV Shows</string>
     <string name="lbl_other">Other</string>
     <string name="because_you_watched">Because you watched %1$s</string>
     <string name="lbl_play_all">Play all</string>
     <string name="lbl_shuffle_all">Shuffle all</string>
     <string name="lbl_play">Play</string>
+    <string name="lbl_details">Details</string>
     <string name="lbl_pause">Pause</string>
     <string name="lbl_exit">Exit</string>
     <string name="lbl_cancel">Cancel</string>
@@ -59,7 +61,9 @@
     <string name="lbl_items">Items</string>
     <string name="lbl_item">Item</string>
     <string name="lbl_series">Series</string>
+    <string name="lbl_season">Season</string>
     <string name="lbl_seasons">Seasons</string>
+    <string name="media_bar_ends_at">Ends at %1$s</string>
     <string name="lbl_upcoming">Upcoming</string>
     <string name="lbl_favorite">Favorite</string>
     <string name="lbl_watched">Watched</string>
@@ -279,6 +283,7 @@
     <string name="lbl_image_type">Image type</string>
     <string name="lbl_image_size">Image size</string>
     <string name="lbl_my_media">My media</string>
+    <string name="lbl_my_requests">My Requests</string>
     <string name="pref_theme_dark">Dark (Default)</string>
     <string name="pref_theme_emerald">Classic emerald</string>
     <string name="pref_about_title">About</string>
