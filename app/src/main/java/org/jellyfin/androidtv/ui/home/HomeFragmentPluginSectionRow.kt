@@ -9,7 +9,6 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
-import org.jellyfin.androidtv.R
 import org.jellyfin.androidtv.data.repository.ItemRepository
 import org.jellyfin.androidtv.ui.itemhandling.ItemRowAdapter
 import org.jellyfin.androidtv.ui.presentation.CardPresenter
@@ -23,38 +22,63 @@ import org.jellyfin.sdk.model.serializer.toUUIDOrNull
 import timber.log.Timber
 import java.util.UUID
 
-class HomeFragmentRequestsRow(
+/**
+ * A row from the server's Home Screen Sections plugin (the sections shown on web).
+ */
+class HomeFragmentPluginSectionRow(
+	private val title: String,
 	private val items: List<BaseItemDto>,
 ) : HomeFragmentRow {
 	override fun addToRowsAdapter(context: Context, cardPresenter: CardPresenter, rowsAdapter: MutableObjectAdapter<Row>) {
 		if (items.isEmpty()) return
 
 		val rowAdapter = ItemRowAdapter(context, items, cardPresenter, rowsAdapter, true)
-		val header = HeaderItem(context.getString(R.string.lbl_my_requests))
-		val row = ListRow(header, rowAdapter)
+		val row = ListRow(HeaderItem(title), rowAdapter)
 		rowAdapter.setRow(row)
 		rowAdapter.Retrieve()
 		rowsAdapter.add(row)
 	}
 
-	companion object {
-		private const val SECTION_TYPE = "MyJellyseerrRequests"
+	data class Section(val type: String, val title: String, val additionalData: String?)
 
-		suspend fun fetch(api: ApiClient, userId: UUID): List<BaseItemDto> = try {
-			val ids = sectionItemIds(api, userId)
-			if (ids.isEmpty()) {
-				Timber.w("My Requests section returned no item ids")
-				emptyList()
-			} else {
-				val loaded = loadLibraryItems(api, ids)
-				Timber.i("My Requests loaded ${loaded.size} titles from ${ids.size} ids")
-				loaded
-			}
+	companion object {
+		/**
+		 * Shown natively (Continue Watching) or not library items (Discover, Upcoming),
+		 * which the card presenter can't display.
+		 */
+		private val SKIPPED = setOf(
+			"ContinueWatching", "ContinueWatchingNextUp", "NextUp",
+			"Discover", "DiscoverMovies", "DiscoverTV",
+			"UpcomingMovies", "UpcomingShows", "UpcomingMusic", "UpcomingBooks",
+			"MyMedia", "LiveTV",
+		)
+
+		/** The user's enabled sections in web order, or empty when the plugin is unavailable. */
+		suspend fun sections(api: ApiClient, userId: UUID): List<Section> = try {
+			val payload = api.get<JsonObject>(
+				pathTemplate = "/HomeScreen/Sections",
+				queryParameters = mapOf("userId" to userId),
+			).content
+			payload["Items"]?.jsonArray.orEmpty()
+				.mapNotNull { element ->
+					val obj = element.jsonObject
+					val type = obj.str("Section") ?: return@mapNotNull null
+					Section(type, obj.str("DisplayText") ?: type, obj.str("AdditionalData"))
+				}
+				.filter { it.type !in SKIPPED }
+				.distinctBy { it.type to it.additionalData }
+		} catch (err: Exception) {
+			Timber.w(err, "Home Screen Sections plugin is unavailable")
+			emptyList()
+		}
+
+		suspend fun fetch(api: ApiClient, userId: UUID, section: Section): List<BaseItemDto> = try {
+			loadLibraryItems(api, sectionItemIds(api, userId, section))
 		} catch (err: ApiClientException) {
-			Timber.e(err, "My Requests home section is unavailable")
+			Timber.e(err, "Home section ${section.type} is unavailable")
 			emptyList()
 		} catch (err: Exception) {
-			Timber.e(err, "My Requests home section failed to load")
+			Timber.e(err, "Home section ${section.type} failed to load")
 			emptyList()
 		}
 
@@ -62,14 +86,15 @@ class HomeFragmentRequestsRow(
 		 * Read only ids from the plugin JSON. Full BaseItemDto decoding of that
 		 * payload can fail (dates/enums), which hid the whole row.
 		 */
-		private suspend fun sectionItemIds(api: ApiClient, userId: UUID): List<UUID> {
+		private suspend fun sectionItemIds(api: ApiClient, userId: UUID, section: Section): List<UUID> {
 			val payload = api.get<JsonObject>(
 				pathTemplate = "/HomeScreen/Section/{sectionType}",
-				pathParameters = mapOf("sectionType" to SECTION_TYPE),
-				queryParameters = mapOf(
-					"UserId" to userId,
-					"userId" to userId,
-				),
+				pathParameters = mapOf("sectionType" to section.type),
+				queryParameters = buildMap {
+					put("UserId", userId)
+					put("userId", userId)
+					section.additionalData?.let { put("AdditionalData", it) }
+				},
 			).content
 
 			val items = payload["Items"]?.jsonArray

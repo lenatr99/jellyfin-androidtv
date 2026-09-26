@@ -20,6 +20,9 @@ import androidx.lifecycle.flowWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.filterNotNull
@@ -122,6 +125,8 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 
 			// Start out with default sections
 			val homesections = userSettingPreferences.activeHomesections
+			// Web home sections from the server plugin; these replace the built-in latest rows
+			val pluginSections = HomeFragmentPluginSectionRow.sections(api, currentUser.id)
 
 			// Make sure the rows are empty
 			val rows = mutableListOf<HomeFragmentRow>()
@@ -135,7 +140,9 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 			for (section in homesections) {
 				val before = rows.size
 				when (section) {
-					HomeSectionType.LATEST_MEDIA -> rows.add(helper.loadRecentlyAdded(userViewsRepository.views.first()))
+					HomeSectionType.LATEST_MEDIA -> if (pluginSections.isEmpty()) {
+						rows.add(helper.loadRecentlyAdded(userViewsRepository.views.first()))
+					}
 					// Hide My Media; libraries stay reachable from the sidebar.
 					HomeSectionType.LIBRARY_TILES_SMALL,
 					HomeSectionType.LIBRARY_BUTTONS -> Unit
@@ -160,10 +167,15 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 				}
 			}
 
-			val requestItems = HomeFragmentRequestsRow.fetch(api, currentUser.id)
-			if (requestItems.isNotEmpty()) {
-				rows.add(insertRequestsAt ?: rows.size, HomeFragmentRequestsRow(requestItems))
+			// Few requests at a time keeps older TVs responsive; order follows the web home screen
+			val pluginRows = coroutineScope {
+				pluginSections.map { section ->
+					async(pluginSectionDispatcher) {
+						HomeFragmentPluginSectionRow(section.title, HomeFragmentPluginSectionRow.fetch(api, currentUser.id, section))
+					}
+				}.awaitAll()
 			}
+			rows.addAll(insertRequestsAt ?: rows.size, pluginRows)
 
 			// Add sections to layout
 			withContext(Dispatchers.Main) {
@@ -437,5 +449,6 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 
 	companion object {
 		private const val CONTENT_ROW_TOP_DP = 108f
+		private val pluginSectionDispatcher = Dispatchers.IO.limitedParallelism(3)
 	}
 }
