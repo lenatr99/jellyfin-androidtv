@@ -33,6 +33,7 @@ import org.jellyfin.androidtv.ui.search.composable.SearchVoiceInput
 import org.jellyfin.androidtv.ui.shared.toolbar.MainToolbar
 import org.jellyfin.androidtv.ui.shared.toolbar.MainToolbarActiveButton
 import org.jellyfin.androidtv.util.speech.rememberSpeechRecognizerAvailability
+import androidx.lifecycle.lifecycleScope
 import org.koin.androidx.compose.koinViewModel
 import org.koin.compose.koinInject
 import org.koin.core.parameter.parametersOf
@@ -48,7 +49,7 @@ class SearchFragment : Fragment() {
 		savedInstanceState: Bundle?
 	) = content {
 		val viewModel = koinViewModel<SearchViewModel>()
-		val searchFragmentDelegate = koinInject<SearchFragmentDelegate> { parametersOf(requireContext()) }
+		val searchFragmentDelegate = koinInject<SearchFragmentDelegate> { parametersOf(requireContext(), lifecycleScope) }
 		var query by rememberSaveable(stateSaver = TextFieldValue.Saver) { mutableStateOf(TextFieldValue()) }
 		val textInputFocusRequester = remember { FocusRequester() }
 		val resultFocusRequester = remember { FocusRequester() }

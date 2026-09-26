@@ -10,12 +10,14 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import org.jellyfin.androidtv.R
+import org.jellyfin.sdk.api.client.ApiClient
 import org.jellyfin.sdk.model.api.BaseItemKind
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 
 class SearchViewModel(
-	private val searchRepository: SearchRepository
+	private val searchRepository: SearchRepository,
+	private val api: ApiClient,
 ) : ViewModel() {
 	companion object {
 		private val debounceDuration = 600.milliseconds
@@ -62,7 +64,8 @@ class SearchViewModel(
 		searchJob = viewModelScope.launch {
 			delay(debounce)
 
-			_searchResultsFlow.value = groups.map { (stringRes, itemKinds) ->
+			val seerr = async { SeerrSearch.search(api, trimmed) }
+			val library = groups.map { (stringRes, itemKinds) ->
 				async {
 					val result = searchRepository.search(trimmed, itemKinds)
 					val items = result.getOrNull().orEmpty()
@@ -70,6 +73,7 @@ class SearchViewModel(
 					SearchResultGroup(stringRes, items)
 				}
 			}.awaitAll()
+			_searchResultsFlow.value = library + SearchResultGroup(R.string.lbl_seerr_request, emptyList(), seerr.await())
 		}
 
 		return true

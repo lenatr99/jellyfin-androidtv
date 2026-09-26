@@ -639,4 +639,8 @@
     <string name="filters">Filtri</string>
     <string name="backdrop_behavior_with_blur">Ozadje z zameglitvijo</string>
     <string name="backdrop_behavior_without_blur">Ozadje brez zameglitve</string>
+    <string name="lbl_seerr_request">Zahtevaj na Jellyseerr</string>
+    <string name="lbl_seerr_request_confirm">Tega še ni v knjižnici. Ga želiš zahtevati?</string>
+    <string name="lbl_seerr_requested">Zahtevano</string>
+    <string name="lbl_seerr_request_failed">Zahteva ni uspela</string>
 </resources>

@@ -702,4 +702,8 @@
     <string name="truehd">TrueHD</string>
     <string name="eac3_atmos">DD+ Atmos</string>
     <string name="truehd_atmos">TrueHD Atmos</string>
+    <string name="lbl_seerr_request">Request on Jellyseerr</string>
+    <string name="lbl_seerr_request_confirm">Not in the library yet. Request it?</string>
+    <string name="lbl_seerr_requested">Requested</string>
+    <string name="lbl_seerr_request_failed">Request failed</string>
 </resources>

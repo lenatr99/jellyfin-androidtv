@@ -45,6 +45,7 @@ import org.jellyfin.androidtv.ui.itemhandling.BaseItemDtoBaseRowItem
 import org.jellyfin.androidtv.ui.itemhandling.BaseRowItem
 import org.jellyfin.androidtv.ui.itemhandling.BaseRowType
 import org.jellyfin.androidtv.ui.itemhandling.GridButtonBaseRowItem
+import org.jellyfin.androidtv.ui.search.SeerrRowItem
 import org.jellyfin.androidtv.util.ImageHelper
 import org.jellyfin.androidtv.util.apiclient.JellyfinImage
 import org.jellyfin.androidtv.util.apiclient.getUrl
@@ -322,6 +323,13 @@ private fun CardViewHolderContent(
 						scaleType = displayConfig.scaleType ?: ImageView.ScaleType.CENTER_CROP,
 						modifier = Modifier
 							.fillMaxSize()
+					)
+				} else if (item is SeerrRowItem && item.posterUrl != null) {
+					AsyncImage(
+						url = item.posterUrl,
+						aspectRatio = aspectRatio,
+						scaleType = ImageView.ScaleType.CENTER_CROP,
+						modifier = Modifier.fillMaxSize()
 					)
 				} else if (item is GridButtonBaseRowItem && item.gridButton.imageRes != null) {
 					Image(
