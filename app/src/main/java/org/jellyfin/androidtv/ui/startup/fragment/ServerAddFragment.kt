@@ -25,6 +25,7 @@ import org.koin.androidx.viewmodel.ext.android.viewModel
 class ServerAddFragment : Fragment() {
 	companion object {
 		const val ARG_SERVER_ADDRESS = "server_address"
+		const val DEFAULT_SERVER_ADDRESS = "https://jellyfin.lenalab.si"
 	}
 
 	private val startupViewModel: ServerAddViewModel by viewModel()
@@ -64,6 +65,7 @@ class ServerAddFragment : Fragment() {
 			binding.address.isEnabled = false
 			submitAddress()
 		} else {
+			binding.address.setText(DEFAULT_SERVER_ADDRESS)
 			binding.address.requestFocus()
 		}
 

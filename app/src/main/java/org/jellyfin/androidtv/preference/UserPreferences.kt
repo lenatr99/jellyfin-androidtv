@@ -121,13 +121,13 @@ class UserPreferences(context: Context) : SharedPreferenceStore(
 		/**
 		 * Playback buffer size preset.
 		 */
-		var bufferLength = enumPreference("buffer_length", BufferLength.AUTO)
+		var bufferLength = enumPreference("buffer_length", BufferLength.LARGE)
 
 		/* Playback - Audio related */
 		/**
 		 * Preferred behavior for audio streaming.
 		 */
-		var audioBehaviour = enumPreference("audio_behavior", AudioBehavior.DIRECT_STREAM)
+		var audioBehaviour = enumPreference("audio_behavior", AudioBehavior.DOWNMIX_TO_STEREO)
 
 		/**
 		 * Preferred behavior for audio streaming.
@@ -137,7 +137,7 @@ class UserPreferences(context: Context) : SharedPreferenceStore(
 		/**
 		 * AC3 bitstream device profile override.
 		 */
-		var bitstreamAc3 = enumPreference("bitstream_ac3_mode", BitstreamAudioMode.AUTO)
+		var bitstreamAc3 = enumPreference("bitstream_ac3_mode", BitstreamAudioMode.DISABLE)
 
 		/**
 		 * EAC3 bitstream device profile override.

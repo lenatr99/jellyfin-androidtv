@@ -54,6 +54,7 @@ class SelectServerFragment : Fragment() {
 	private var _binding: FragmentSelectServerBinding? = null
 	private val binding get() = _binding!!
 	private val startupViewModel: StartupViewModel by activityViewModel()
+	private var openedDefaultServer = false
 
 	@Suppress("LongMethod")
 	override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View? {
@@ -149,6 +150,12 @@ class SelectServerFragment : Fragment() {
 
 					// Make sure focus is properly set when no servers exist
 					if (servers.isEmpty()) binding.enterServerAddress.requestFocus()
+
+					// Personal TV build: skip typing the known server address on first launch.
+					if (servers.isEmpty() && !openedDefaultServer) {
+						openedDefaultServer = true
+						binding.root.post { openDefaultServer() }
+					}
 				}.launchIn(this)
 
 				startupViewModel.discoveredServers.onEach { servers ->
@@ -192,10 +199,7 @@ class SelectServerFragment : Fragment() {
 
 		// Manual
 		binding.enterServerAddress.setOnClickListener {
-			parentFragmentManager.commit {
-				addToBackStack(null)
-				replace<ServerAddFragment>(R.id.content_view)
-			}
+			openDefaultServer(autoSubmit = false)
 		}
 
 		// App info
@@ -206,6 +210,22 @@ class SelectServerFragment : Fragment() {
 		binding.root.requestFocus()
 
 		return binding.root
+	}
+
+	private fun openDefaultServer(autoSubmit: Boolean = true) {
+		if (!isAdded) return
+		parentFragmentManager.commit {
+			addToBackStack(null)
+			replace<ServerAddFragment>(
+				R.id.content_view,
+				null,
+				createBundle {
+					if (autoSubmit) {
+						putString(ServerAddFragment.ARG_SERVER_ADDRESS, ServerAddFragment.DEFAULT_SERVER_ADDRESS)
+					}
+				}
+			)
+		}
 	}
 
 	override fun onDestroyView() {
