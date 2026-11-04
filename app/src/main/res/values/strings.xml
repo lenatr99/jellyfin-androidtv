@@ -720,6 +720,8 @@
     <string name="lbl_seerr_writers">Writers</string>
     <string name="lbl_seerr_created_by">Created by</string>
     <string name="lbl_seerr_cast">Cast</string>
+    <string name="lbl_seerr_person_row">%1$s – %2$s</string>
+    <string name="lbl_seerr_no_credits">No titles found</string>
     <string name="lbl_seerr_release_status">Release status</string>
     <string name="lbl_seerr_last_aired">Last aired</string>
     <string name="lbl_seerr_revenue">Revenue</string>

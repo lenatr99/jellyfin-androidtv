@@ -108,6 +108,12 @@ object SeerrSearch {
 	// Jellyseerr request status: 3 = declined
 	private const val REQUEST_DECLINED = 3
 
+	// A show role counts in full from this many episodes, so a guest spot ranks below a lead role
+	private const val FULL_ROLE_EPISODES = 20
+
+	// TMDB genres: news, reality and talk
+	private val UNSCRIPTED_GENRES = setOf(10763, 10764, 10767)
+
 	// Jellyseerr's image proxy: TMDB's own CDN certificate isn't trusted by older TVs
 	private const val TMDB_IMAGE_PROXY = "https://jellyseerr.lenalab.si/imageproxy/tmdb"
 	private const val POSTER_BASE = "$TMDB_IMAGE_PROXY/t/p/w300"
@@ -125,24 +131,56 @@ object SeerrSearch {
 		).content
 		payload["results"]?.jsonArray.orEmpty().mapNotNull { element ->
 			val obj = element.jsonObject
-			val mediaType = obj.str("mediaType")?.takeIf { it == "movie" || it == "tv" } ?: return@mapNotNull null
-			val status = obj["mediaInfo"]?.jsonObject?.get("status")?.jsonPrimitive?.intOrNull
-			if (status == STATUS_AVAILABLE) return@mapNotNull null
-			val tmdbId = obj["id"]?.jsonPrimitive?.intOrNull ?: return@mapNotNull null
+			if (obj["mediaInfo"]?.jsonObject?.get("status")?.jsonPrimitive?.intOrNull == STATUS_AVAILABLE) return@mapNotNull null
 			// Already shown in the library results above
-			if ("$mediaType:$tmdbId" in library) return@mapNotNull null
-			SeerrRowItem(
-				tmdbId = tmdbId,
-				mediaType = mediaType,
-				title = obj.str("title") ?: obj.str("name") ?: return@mapNotNull null,
-				year = (obj.str("releaseDate") ?: obj.str("firstAirDate") ?: obj.str("first_air_date"))?.take(4),
-				posterUrl = (obj.str("posterPath") ?: obj.str("poster_path"))?.let { "$POSTER_BASE$it" },
-				requested = status != null,
-			)
+			rowItem(obj, library)?.takeIf { it.libraryId == null }
 		}
 	} catch (err: Exception) {
 		Timber.w(err, "Jellyseerr search is unavailable")
 		emptyList()
+	}
+
+	/** Movies and shows a person acted in, best known first, without chat show and news appearances. */
+	suspend fun credits(api: ApiClient, personId: Int): List<SeerrRowItem> = try {
+		val library = LibraryTmdbIndex.get(api)
+		val payload = api.get<JsonObject>(
+			pathTemplate = "/JellyfinEnhanced/jellyseerr/person/{personId}/combined_credits",
+			pathParameters = mapOf("personId" to personId),
+		).content
+		payload["cast"]?.jsonArray.orEmpty()
+			.mapNotNull { it as? JsonObject }
+			.filterNot { credit ->
+				val genres = (credit["genreIds"] as? JsonArray).orEmpty().mapNotNull { (it as? JsonPrimitive)?.intOrNull }
+				genres.any { it in UNSCRIPTED_GENRES } || credit.str("character")?.contains("self", ignoreCase = true) == true
+			}
+			.sortedByDescending(::creditScore)
+			.mapNotNull { rowItem(it, library) }
+			.filter { it.posterUrl != null }
+			.distinct()
+	} catch (err: Exception) {
+		Timber.w(err, "Jellyseerr credits unavailable for person $personId")
+		emptyList()
+	}
+
+	/** Popularity weighed by episodes, the same score as media-stack person-credits.js. */
+	private fun creditScore(credit: JsonObject): Double {
+		val votes = (credit["voteCount"] as? JsonPrimitive)?.intOrNull ?: 0
+		val episodes = (credit["episodeCount"] as? JsonPrimitive)?.intOrNull?.takeIf { it > 0 } ?: return votes.toDouble()
+		return votes.toDouble() * minOf(episodes, FULL_ROLE_EPISODES) / FULL_ROLE_EPISODES
+	}
+
+	private fun rowItem(obj: JsonObject, library: Map<String, UUID>): SeerrRowItem? {
+		val mediaType = obj.str("mediaType")?.takeIf { it == "movie" || it == "tv" } ?: return null
+		val tmdbId = (obj["id"] as? JsonPrimitive)?.intOrNull ?: return null
+		return SeerrRowItem(
+			tmdbId = tmdbId,
+			mediaType = mediaType,
+			title = obj.str("title") ?: obj.str("name") ?: return null,
+			year = (obj.str("releaseDate") ?: obj.str("firstAirDate") ?: obj.str("first_air_date"))?.take(4),
+			posterUrl = (obj.str("posterPath") ?: obj.str("poster_path"))?.let { "$POSTER_BASE$it" },
+			requested = ((obj["mediaInfo"] as? JsonObject)?.get("status") as? JsonPrimitive)?.intOrNull != null,
+			libraryId = library["$mediaType:$tmdbId"],
+		)
 	}
 
 	/** Jellyseerr details for a movie or show, including its library and request status. */

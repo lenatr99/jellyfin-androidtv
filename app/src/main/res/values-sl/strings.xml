@@ -17,7 +17,7 @@
     <string name="lbl_enter_server_address">Vnesi naslov strežnika</string>
     <string name="lbl_yes">Da</string>
     <string name="lbl_no">Ne</string>
-    <string name="lbl_play_trailers">Predvajaj napovednik(e)</string>
+    <string name="lbl_play_trailers">Predvajaj napovednik</string>
     <string name="lbl_trailer">"Napovednik "</string>
     <string name="lbl_bracket_unknown">&lt;Neznano&gt;</string>
     <string name="msg_video_playback_error">"Napaka pri predvajanju videa - "</string>
@@ -656,6 +656,8 @@
     <string name="lbl_seerr_writers">Scenarij</string>
     <string name="lbl_seerr_created_by">Ustvarili</string>
     <string name="lbl_seerr_cast">Igralci</string>
+    <string name="lbl_seerr_person_row">%1$s – %2$s</string>
+    <string name="lbl_seerr_no_credits">Ni najdenih naslovov</string>
     <string name="lbl_seerr_release_status">Stanje izida</string>
     <string name="lbl_seerr_last_aired">Zadnje predvajanje</string>
     <string name="lbl_seerr_revenue">Prihodek</string>

@@ -231,6 +231,11 @@ class SeerrDetailsFragment : Fragment() {
 			card.castRole.text = person.str("character")
 			card.castImage.clipToOutline = true
 			card.castImage.load(person.str("profilePath")?.let { SeerrSearch.tmdbImage(it, "w185") }, null, placeholder)
+			val personId = (person["id"] as? JsonPrimitive)?.intOrNull
+			val name = person.str("name")
+			if (personId != null && name != null) card.root.setOnClickListener {
+				navigationRepository.navigate(Destinations.seerrPerson(personId, name))
+			}
 			card.root.setOnFocusChangeListener { view, hasFocus ->
 				val scale = if (hasFocus) FOCUS_SCALE else 1f
 				view.animate().scaleX(scale).scaleY(scale).setDuration(FOCUS_ANIMATION_MS)

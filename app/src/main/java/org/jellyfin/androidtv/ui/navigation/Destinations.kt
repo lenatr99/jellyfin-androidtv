@@ -24,6 +24,7 @@ import org.jellyfin.androidtv.ui.player.photo.PhotoPlayerFragment
 import org.jellyfin.androidtv.ui.player.video.VideoPlayerFragment
 import org.jellyfin.androidtv.ui.search.SearchFragment
 import org.jellyfin.androidtv.ui.search.SeerrDetailsFragment
+import org.jellyfin.androidtv.ui.search.SeerrPersonFragment
 import org.jellyfin.androidtv.ui.search.SeerrRowItem
 import org.jellyfin.sdk.model.api.BaseItemDto
 import org.jellyfin.sdk.model.api.ItemSortBy
@@ -85,6 +86,11 @@ object Destinations {
 	// Item details
 	fun itemDetails(item: UUID) = fragmentDestination<FullDetailsFragment> {
 		putString("ItemId", item.toString())
+	}
+
+	fun seerrPerson(personId: Int, name: String) = fragmentDestination<SeerrPersonFragment> {
+		putInt(SeerrPersonFragment.ARG_PERSON_ID, personId)
+		putString(SeerrPersonFragment.ARG_NAME, name)
 	}
 
 	fun seerrDetails(item: SeerrRowItem) = fragmentDestination<SeerrDetailsFragment> {
