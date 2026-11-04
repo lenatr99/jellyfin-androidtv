@@ -651,4 +651,5 @@
     <string name="lbl_seerr_first_aired">Prvo predvajanje</string>
     <string name="lbl_seerr_network">Mreža</string>
     <string name="lbl_seerr_studio">Studio</string>
+    <string name="lbl_seerr_trailer_failed">Napovednik ni na voljo</string>
 </resources>

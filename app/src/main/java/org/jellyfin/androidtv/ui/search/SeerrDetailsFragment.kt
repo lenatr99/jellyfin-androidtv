@@ -1,12 +1,17 @@
 package org.jellyfin.androidtv.ui.search
 
-import android.content.Intent
+import android.app.Dialog
+import android.graphics.Color
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Toast
-import androidx.core.net.toUri
+import androidx.media3.common.MediaItem
+import androidx.media3.common.PlaybackException
+import androidx.media3.common.Player
+import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.ui.PlayerView
 import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
@@ -30,6 +35,7 @@ import org.jellyfin.sdk.model.api.BaseItemDto
 import org.jellyfin.sdk.model.api.BaseItemKind
 import org.jellyfin.sdk.model.serializer.toUUIDOrNull
 import org.koin.android.ext.android.inject
+import timber.log.Timber
 import java.util.UUID
 
 /**
@@ -48,6 +54,7 @@ class SeerrDetailsFragment : Fragment() {
 
 		private const val TICKS_PER_MINUTE = 600_000_000L
 	}
+
 
 	private val api by inject<ApiClient>()
 	private val backgroundService by inject<BackgroundService>()
@@ -145,10 +152,10 @@ class SeerrDetailsFragment : Fragment() {
 				requester.request(item, seasons) { render(view) }
 			}
 		)
-		trailerIntent()?.let { intent ->
+		trailerKey()?.let { key ->
 			binding.fdButtonRow.addView(
 				TextUnderButton.create(requireContext(), R.drawable.ic_trailer, buttonSize, 0, getString(R.string.lbl_play_trailers)) {
-					startActivity(intent)
+					playTrailer(key)
 				}
 			)
 		}
@@ -156,16 +163,44 @@ class SeerrDetailsFragment : Fragment() {
 		binding.fdButtonRow.isVisible = binding.fdButtonRow.childCount > 0
 	}
 
-	/** A YouTube trailer, preferring a real trailer over teasers; YouTube's own scheme opens the player directly. */
-	private fun trailerIntent(): Intent? = details?.get("relatedVideos")?.jsonArray.orEmpty()
+	/** A YouTube trailer, preferring a real trailer over teasers. */
+	private fun trailerKey(): String? = details?.get("relatedVideos")?.jsonArray.orEmpty()
 		.map { it.jsonObject }
 		.filter { it.str("site") == "YouTube" && it.str("key") != null }
 		.sortedBy { if (it.str("type") == "Trailer") 0 else if (it.str("type") == "Teaser") 1 else 2 }
 		.firstOrNull()
 		?.str("key")
-		?.let { key ->
-			listOf("vnd.youtube:$key", "https://www.youtube.com/watch?v=$key")
-				.map { Intent(Intent.ACTION_VIEW, it.toUri()) }
-				.firstOrNull { it.resolveActivity(requireContext().packageManager) != null }
+
+	/**
+	 * Plays the trailer in the app's own player. The server fetches it from YouTube as
+	 * H.264 MP4 (media-stack scripts/jellyfin/trailers): this TV's YouTube app and
+	 * embedded player can't play it. Back closes it.
+	 */
+	private fun playTrailer(key: String) {
+		val context = requireContext()
+		val player = ExoPlayer.Builder(context).build().apply {
+			setMediaItem(MediaItem.fromUri("${api.baseUrl}/trailers/$key.mp4?api_key=${api.accessToken}"))
+			playWhenReady = true
+			prepare()
 		}
+		val playerView = PlayerView(context).apply {
+			this.player = player
+			setBackgroundColor(Color.BLACK)
+			setShowBuffering(PlayerView.SHOW_BUFFERING_ALWAYS)
+			useController = true
+		}
+		player.addListener(object : Player.Listener {
+			override fun onPlayerError(error: PlaybackException) {
+				Timber.w(error, "Trailer playback failed")
+				Toast.makeText(context, R.string.lbl_seerr_trailer_failed, Toast.LENGTH_SHORT).show()
+			}
+		})
+
+		Dialog(context, android.R.style.Theme_Black_NoTitleBar_Fullscreen).apply {
+			setContentView(playerView)
+			setOnDismissListener { player.release() }
+			show()
+		}
+		playerView.requestFocus()
+	}
 }
