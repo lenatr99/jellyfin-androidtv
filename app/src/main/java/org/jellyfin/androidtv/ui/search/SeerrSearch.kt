@@ -101,6 +101,8 @@ object LibraryTmdbIndex {
 data class SeerrSeason(val number: Int, val name: String, val requestable: Boolean)
 
 object SeerrSearch {
+	const val MEDIA_TYPE_PERSON = "person"
+
 	// Jellyseerr media status: 1 = unknown (not requested), 5 = available (already in the library)
 	private const val STATUS_UNKNOWN = 1
 	private const val STATUS_AVAILABLE = 5
@@ -131,6 +133,7 @@ object SeerrSearch {
 		).content
 		payload["results"]?.jsonArray.orEmpty().mapNotNull { element ->
 			val obj = element.jsonObject
+			if (obj.str("mediaType") == MEDIA_TYPE_PERSON) return@mapNotNull personItem(obj)
 			if (obj["mediaInfo"]?.jsonObject?.get("status")?.jsonPrimitive?.intOrNull == STATUS_AVAILABLE) return@mapNotNull null
 			// Already shown in the library results above
 			rowItem(obj, library)?.takeIf { it.libraryId == null }
@@ -168,6 +171,16 @@ object SeerrSearch {
 		val episodes = (credit["episodeCount"] as? JsonPrimitive)?.intOrNull?.takeIf { it > 0 } ?: return votes.toDouble()
 		return votes.toDouble() * minOf(episodes, FULL_ROLE_EPISODES) / FULL_ROLE_EPISODES
 	}
+
+	/** An actor card, which opens their filmography. People without a photo are rarely who was searched for. */
+	private fun personItem(obj: JsonObject): SeerrRowItem? = SeerrRowItem(
+		tmdbId = (obj["id"] as? JsonPrimitive)?.intOrNull ?: return null,
+		mediaType = MEDIA_TYPE_PERSON,
+		title = obj.str("name") ?: return null,
+		year = null,
+		posterUrl = tmdbImage(obj.str("profilePath") ?: return null, "w185"),
+		requested = false,
+	)
 
 	private fun rowItem(obj: JsonObject, library: Map<String, UUID>): SeerrRowItem? {
 		val mediaType = obj.str("mediaType")?.takeIf { it == "movie" || it == "tv" } ?: return null
@@ -269,6 +282,10 @@ class SeerrRequester(
 	private val navigationRepository: NavigationRepository,
 ) {
 	fun open(item: SeerrRowItem) {
+		if (item.mediaType == SeerrSearch.MEDIA_TYPE_PERSON) {
+			navigationRepository.navigate(Destinations.seerrPerson(item.tmdbId, item.title))
+			return
+		}
 		val owned = item.libraryId
 		if (owned != null && item.mediaType != "tv") navigationRepository.navigate(Destinations.itemDetails(owned))
 		else navigationRepository.navigate(Destinations.seerrDetails(item))

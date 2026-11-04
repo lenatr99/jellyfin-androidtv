@@ -1,12 +1,14 @@
 package org.jellyfin.androidtv.ui.search
 
 import android.content.Context
+import androidx.annotation.StringRes
 import androidx.leanback.widget.HeaderItem
 import androidx.leanback.widget.ListRow
 import androidx.leanback.widget.OnItemViewClickedListener
 import androidx.leanback.widget.OnItemViewSelectedListener
 import androidx.leanback.widget.Row
 import kotlinx.coroutines.CoroutineScope
+import org.jellyfin.androidtv.R
 import org.jellyfin.androidtv.constant.QueryType
 import org.jellyfin.androidtv.data.service.BackgroundService
 import org.jellyfin.androidtv.ui.itemhandling.BaseRowItem
@@ -33,8 +35,14 @@ class SearchFragmentDelegate(
 		rowsAdapter.clear()
 		val adapters = mutableListOf<ItemRowAdapter>()
 		val seerrGroup = searchResultGroups.firstOrNull { it.seerrItems.isNotEmpty() }
+		val (actors, titles) = seerrGroup?.seerrItems.orEmpty().partition { it.mediaType == SeerrSearch.MEDIA_TYPE_PERSON }
+		// Jellyseerr ranks by relevance, so only lead with actors when one is the best match
+		val actorsFirst = seerrGroup?.seerrItems?.firstOrNull()?.mediaType == SeerrSearch.MEDIA_TYPE_PERSON
+		if (actorsFirst) addSeerrRow(R.string.lbl_people, actors)
 		for ((labelRes, baseItems) in searchResultGroups) {
 			if (baseItems.isEmpty()) continue
+			// Jellyseerr actors open a full filmography, so they replace the library's people
+			if (labelRes == R.string.lbl_people && actors.isNotEmpty()) continue
 			val adapter = ItemRowAdapter(
 				context,
 				baseItems.toList(),
@@ -49,11 +57,15 @@ class SearchFragmentDelegate(
 		for (adapter in adapters) adapter.Retrieve()
 
 		// Jellyseerr titles last, like on web
-		if (seerrGroup != null) {
-			val seerrAdapter = MutableObjectAdapter<SeerrRowItem>(CardPresenter())
-			seerrGroup.seerrItems.forEach(seerrAdapter::add)
-			rowsAdapter.add(ListRow(HeaderItem(context.getString(seerrGroup.labelRes)), seerrAdapter))
-		}
+		if (seerrGroup != null) addSeerrRow(seerrGroup.labelRes, titles)
+		if (!actorsFirst) addSeerrRow(R.string.lbl_people, actors)
+	}
+
+	private fun addSeerrRow(@StringRes labelRes: Int, items: List<SeerrRowItem>) {
+		if (items.isEmpty()) return
+		val adapter = MutableObjectAdapter<SeerrRowItem>(CardPresenter())
+		items.forEach(adapter::add)
+		rowsAdapter.add(ListRow(HeaderItem(context.getString(labelRes)), adapter))
 	}
 
 	val onItemViewClickedListener = OnItemViewClickedListener { _, item, _, row ->
