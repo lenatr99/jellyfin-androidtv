@@ -716,4 +716,15 @@
     <string name="lbl_seerr_network">Network</string>
     <string name="lbl_seerr_studio">Studio</string>
     <string name="lbl_seerr_trailer_failed">Trailer is not available</string>
+    <string name="lbl_seerr_director">Director</string>
+    <string name="lbl_seerr_writers">Writers</string>
+    <string name="lbl_seerr_created_by">Created by</string>
+    <string name="lbl_seerr_cast">Cast</string>
+    <string name="lbl_seerr_release_status">Release status</string>
+    <string name="lbl_seerr_last_aired">Last aired</string>
+    <string name="lbl_seerr_revenue">Revenue</string>
+    <string name="lbl_seerr_budget">Budget</string>
+    <string name="lbl_seerr_original_language">Original language</string>
+    <string name="lbl_seerr_production_country">Production country</string>
+    <string name="lbl_seerr_audience_score">Audience %1$d%%</string>
 </resources>

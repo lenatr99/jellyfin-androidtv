@@ -156,6 +156,17 @@ object SeerrSearch {
 		null
 	}
 
+	/** Rotten Tomatoes and IMDb scores; many titles have none, so a failed lookup is expected. */
+	suspend fun ratings(api: ApiClient, item: SeerrRowItem): JsonObject? = try {
+		api.get<JsonObject>(
+			pathTemplate = "/JellyfinEnhanced/jellyseerr/{type}/{tmdbId}/${if (item.mediaType == "tv") "ratings" else "ratingscombined"}",
+			pathParameters = mapOf("type" to item.mediaType, "tmdbId" to item.tmdbId),
+		).content
+	} catch (err: Exception) {
+		Timber.i(err, "Jellyseerr ratings unavailable for ${item.title}")
+		null
+	}
+
 	/** The library item when this title is fully available, so it can be opened instead of requested. */
 	fun libraryItemId(details: JsonObject): UUID? {
 		val mediaInfo = details["mediaInfo"]?.jsonObject ?: return null

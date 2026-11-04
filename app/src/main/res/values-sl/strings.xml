@@ -652,4 +652,15 @@
     <string name="lbl_seerr_network">Mreža</string>
     <string name="lbl_seerr_studio">Studio</string>
     <string name="lbl_seerr_trailer_failed">Napovednik ni na voljo</string>
+    <string name="lbl_seerr_director">Režija</string>
+    <string name="lbl_seerr_writers">Scenarij</string>
+    <string name="lbl_seerr_created_by">Ustvarili</string>
+    <string name="lbl_seerr_cast">Igralci</string>
+    <string name="lbl_seerr_release_status">Stanje izida</string>
+    <string name="lbl_seerr_last_aired">Zadnje predvajanje</string>
+    <string name="lbl_seerr_revenue">Prihodek</string>
+    <string name="lbl_seerr_budget">Proračun</string>
+    <string name="lbl_seerr_original_language">Izvirni jezik</string>
+    <string name="lbl_seerr_production_country">Država produkcije</string>
+    <string name="lbl_seerr_audience_score">Občinstvo %1$d%%</string>
 </resources>
