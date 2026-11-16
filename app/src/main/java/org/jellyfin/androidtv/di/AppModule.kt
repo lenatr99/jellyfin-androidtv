@@ -7,7 +7,11 @@ import coil3.annotation.ExperimentalCoilApi
 import coil3.gif.AnimatedImageDecoder
 import coil3.gif.GifDecoder
 import coil3.network.NetworkFetcher
+import coil3.network.CacheStrategy
+import coil3.network.NetworkRequest
+import coil3.network.NetworkResponse
 import coil3.network.okhttp.OkHttpNetworkFetcherFactory
+import coil3.request.Options
 import coil3.serviceLoaderEnabled
 import coil3.svg.SvgDecoder
 import coil3.util.Logger
@@ -119,6 +123,7 @@ val appModule = module {
 		@OptIn(ExperimentalCoilApi::class)
 		OkHttpNetworkFetcherFactory(
 			callFactory = { okHttpFactory.createClient(httpClientOptions) },
+			cacheStrategy = { SuccessOnlyCacheStrategy },
 			connectivityChecker = ::createCoilConnectivityChecker,
 		)
 	}
@@ -181,4 +186,28 @@ val appModule = module {
 	single<PlaybackHelper> { SdkPlaybackHelper(get(), get(), get(), get()) }
 
 	factory { (context: Context, scope: CoroutineScope) -> SearchFragmentDelegate(context, get(), get(), get(), scope, get()) }
+}
+
+/**
+ * Coil keeps error responses (like a 404) in its disk cache and replays them forever, so a poster
+ * that failed once never loaded again. Only successful responses are stored or read back.
+ */
+@OptIn(ExperimentalCoilApi::class)
+private object SuccessOnlyCacheStrategy : CacheStrategy {
+	private fun NetworkResponse.isSuccess() = code in 200 until 300
+
+	override suspend fun read(
+		cacheResponse: NetworkResponse,
+		networkRequest: NetworkRequest,
+		options: Options,
+	) = if (cacheResponse.isSuccess()) CacheStrategy.DEFAULT.read(cacheResponse, networkRequest, options)
+	else CacheStrategy.ReadResult(networkRequest)
+
+	override suspend fun write(
+		cacheResponse: NetworkResponse?,
+		networkRequest: NetworkRequest,
+		networkResponse: NetworkResponse,
+		options: Options,
+	) = if (networkResponse.isSuccess()) CacheStrategy.DEFAULT.write(cacheResponse, networkRequest, networkResponse, options)
+	else CacheStrategy.WriteResult.DISABLED
 }
