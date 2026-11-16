@@ -365,7 +365,8 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 	}
 
 	private fun refreshRows(force: Boolean = false, delayed: Boolean = true) {
-		lifecycleScope.launch(Dispatchers.IO) {
+		// Rows change the view hierarchy, so this stays on the main thread; the adapters do their own background loading
+		lifecycleScope.launch {
 			if (delayed) delay(1.5.seconds)
 
 			repeat(adapter.size()) { i ->

@@ -3,6 +3,8 @@ package org.jellyfin.androidtv.ui.itemhandling;
 import static org.koin.java.KoinJavaComponent.inject;
 
 import android.content.Context;
+import android.os.Handler;
+import android.os.Looper;
 
 import androidx.annotation.Nullable;
 import androidx.leanback.widget.ArrayObjectAdapter;
@@ -581,6 +583,12 @@ public class ItemRowAdapter extends MutableObjectAdapter<Object> {
     }
 
     public void Retrieve() {
+        // Adapter changes touch views; a call from a background thread crashed the app
+        if (Looper.myLooper() != Looper.getMainLooper()) {
+            new Handler(Looper.getMainLooper()).post(this::Retrieve);
+            return;
+        }
+
         notifyRetrieveStarted();
         lastFullRetrieve = Instant.now();
         itemsLoaded = 0;
@@ -668,6 +676,12 @@ public class ItemRowAdapter extends MutableObjectAdapter<Object> {
     }
 
     private void loadPeople() {
+        // Static content: a repeated Retrieve must not add the same items again
+        if (size() > 0) {
+            notifyRetrieveFinished();
+            return;
+        }
+
         if (mPersons != null) {
             for (BaseItemPerson person : mPersons) {
                 add(new BaseItemPersonBaseRowItem(person));
@@ -681,6 +695,12 @@ public class ItemRowAdapter extends MutableObjectAdapter<Object> {
     }
 
     private void loadChapters() {
+        // Static content: a repeated Retrieve must not add the same items again
+        if (size() > 0) {
+            notifyRetrieveFinished();
+            return;
+        }
+
         if (mChapters != null) {
             for (ChapterItemInfo chapter : mChapters) {
                 add(new ChapterItemInfoBaseRowItem(chapter));
@@ -694,6 +714,13 @@ public class ItemRowAdapter extends MutableObjectAdapter<Object> {
     }
 
     private void loadStaticItems() {
+        // Static content: a repeated Retrieve must not add the same items again
+        if (size() > 0) {
+            itemsLoaded = size();
+            notifyRetrieveFinished();
+            return;
+        }
+
         if (mItems != null) {
             for (org.jellyfin.sdk.model.api.BaseItemDto item : mItems) {
                 add(new BaseItemDtoBaseRowItem(item));
